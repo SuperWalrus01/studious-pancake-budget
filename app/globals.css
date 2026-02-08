@@ -1,0 +1,46 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+:root {
+  color-scheme: light;
+}
+
+html,
+body {
+  height: 100%;
+}
+
+body {
+  @apply bg-background text-foreground antialiased;
+}
+
+* {
+  -webkit-tap-highlight-color: transparent;
+}
+
+.app-shell {
+  min-height: 100vh;
+  padding-bottom: calc(env(safe-area-inset-bottom) + 1rem);
+  padding-top: calc(env(safe-area-inset-top) + 0.75rem);
+}
+
+.card {
+  @apply bg-card text-card-foreground rounded-xl shadow-card border border-border;
+}
+
+.button-primary {
+  @apply inline-flex items-center justify-center rounded-full bg-black text-white px-5 py-3 text-base font-medium disabled:opacity-60 disabled:cursor-not-allowed active:scale-[0.98] transition;
+}
+
+.input {
+  @apply w-full rounded-xl border border-border bg-input px-4 py-3 text-base text-foreground placeholder:text-muted-foreground focus:outline-none focus:ring-2 focus:ring-black focus:border-transparent;
+}
+
+.select {
+  @apply w-full rounded-xl border border-border bg-input px-4 py-3 text-base text-foreground focus:outline-none focus:ring-2 focus:ring-black focus:border-transparent;
+}
+
+.navbar {
+  padding-bottom: calc(env(safe-area-inset-bottom) + 0.5rem);
+}
