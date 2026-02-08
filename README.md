@@ -23,24 +23,51 @@ The app is configured as a PWA (`display: "standalone"`) with iOS meta tags for 
 
 ## Using an Apple Shortcut to add an expense
 
-You can use an iOS Shortcut to add an expense by opening a special URL that encodes the expense details as query parameters.
+There are two ways to integrate with Apple Shortcuts:
 
-Base URL (replace with your deployed URL):
+1. **Foreground** – open the PWA and let it add the expense via query params (shows UI).
+2. **Background** – call a backend API endpoint that writes directly to Supabase (no UI).
 
-`https://your-deployed-url.vercel.app/?addExpense=1&description=Coffee&amount=4.50&category=Food`
+### Background mode (recommended)
 
-Supported query parameters:
+Use the API endpoint:
 
-- `addExpense=1` or `shortcutAdd=1` – enables shortcut add mode.
-- `description` or `desc` – text description of the expense.
-- `amount` or `price` – numeric amount (e.g. `4.5` or `4,5`).
+`POST https://YOUR-DEPLOYED-URL.vercel.app/api/add-expense`
+
+Body (JSON):
+
+```json
+{
+	"description": "Coffee",
+	"amount": "4.50",
+	"category": "Food"
+}
+```
+
+Supported JSON fields (all strings):
+
+- `description` or `desc`
+- `amount` or `price` (e.g. `4.5` or `4,5`)
 - `category` or `cat` – one of: `Food`, `Transport`, `Housing`, `Utilities`, `Entertainment`, `Health`, `Shopping`, `Other`.
-
-When the app opens with these parameters, it will automatically add the expense to local storage, switch to the dashboard tab, and scroll to the Add Expense section.
 
 In the Shortcuts app:
 
 1. Create a new Shortcut.
-2. Add an **Open URL** action.
-3. Build the URL using your deployed base URL and the parameters above (you can use Shortcut variables to fill `description`, `amount`, and `category`).
-4. Run the Shortcut to add expenses quickly from anywhere on your iPhone.
+2. Add an **Ask for Input** for description.
+3. Add an **Ask for Input** (Number) for amount.
+4. (Optional) Add a **Choose from List** for category names and map them to the category values above.
+5. Add a **Get Contents of URL** action:
+	 - URL: `https://YOUR-DEPLOYED-URL.vercel.app/api/add-expense`
+	 - Method: `POST`
+	 - Request Body: **JSON** with keys `description`, `amount`, `category` bound to your Shortcut variables.
+	 - Turn **Show When Run** off for fully background behavior.
+
+When this runs, the Shortcut sends a background HTTP POST to the app, which writes the expense into Supabase without opening the browser.
+
+### Foreground mode (opens the PWA)
+
+You can still use the query-param approach if you want to see the app UI:
+
+`https://YOUR-DEPLOYED-URL.vercel.app/?addExpense=1&description=Coffee&amount=4.50&category=Food`
+
+The same parameter names as above are supported.

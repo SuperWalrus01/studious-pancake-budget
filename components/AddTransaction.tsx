@@ -15,7 +15,7 @@ const CATEGORIES: Category[] = [
 ];
 
 type Props = {
-  onAdd: (tx: Omit<Transaction, "id">) => void;
+  onAdd: (tx: Omit<Transaction, "id">) => Promise<void> | void;
 };
 
 export function AddTransaction({ onAdd }: Props) {
@@ -23,7 +23,7 @@ export function AddTransaction({ onAdd }: Props) {
   const [category, setCategory] = useState<Category>("Food");
   const [amount, setAmount] = useState("");
 
-  function handleSubmit(e: FormEvent) {
+  async function handleSubmit(e: FormEvent) {
     e.preventDefault();
     const numericAmount = Number.parseFloat(amount.replace(",", "."));
     if (!description.trim() || !Number.isFinite(numericAmount) || numericAmount <= 0) {
@@ -32,7 +32,7 @@ export function AddTransaction({ onAdd }: Props) {
 
     const now = new Date();
 
-    onAdd({
+    await onAdd({
       description: description.trim(),
       category,
       amount: Number(numericAmount.toFixed(2)),

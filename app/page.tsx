@@ -1,9 +1,10 @@
 "use client";
 
 import { useEffect, useMemo, useRef, useState } from "react";
-import { Plus, PieChart, List } from "lucide-react";
+import { Plus, PieChart, List, Trash2 } from "lucide-react";
 import { AddTransaction } from "@/components/AddTransaction";
 import { Summary } from "@/components/Summary";
+import { supabase } from "@/lib/supabaseClient";
 
 export type Category =
   | "Food"
@@ -23,58 +24,102 @@ export type Transaction = {
   date: string; // ISO string
 };
 
-const STORAGE_KEY = "budgeting-app-transactions";
-
 function getMonthKey(date: Date) {
   return `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, "0")}`;
 }
 
 function useTransactions() {
   const [transactions, setTransactions] = useState<Transaction[]>([]);
+  const [loading, setLoading] = useState(true);
 
   useEffect(() => {
-    if (typeof window === "undefined") return;
-    try {
-      const raw = window.localStorage.getItem(STORAGE_KEY);
-      if (raw) {
-        const parsed: Transaction[] = JSON.parse(raw);
-        setTransactions(parsed);
+    let isMounted = true;
+
+    const load = async () => {
+      setLoading(true);
+      const { data, error } = await supabase
+        .from("expenses")
+        .select("id, description, category, amount, date")
+        .order("date", { ascending: false });
+
+      if (!isMounted) return;
+
+      if (error) {
+        console.error("Failed to load expenses from Supabase", error);
+        setTransactions([]);
+      } else if (data) {
+        setTransactions(
+          data.map((row) => ({
+            id: row.id as string,
+            description: row.description ?? "",
+            category: (row.category ?? "Other") as Category,
+            amount: Number(row.amount ?? 0),
+            date: row.date ?? new Date().toISOString(),
+          }))
+        );
       }
-    } catch (e) {
-      console.error("Failed to load transactions", e);
-    }
+
+      setLoading(false);
+    };
+
+    void load();
+
+    return () => {
+      isMounted = false;
+    };
   }, []);
 
-  useEffect(() => {
-    if (typeof window === "undefined") return;
-    try {
-      window.localStorage.setItem(STORAGE_KEY, JSON.stringify(transactions));
-    } catch (e) {
-      console.error("Failed to save transactions", e);
-    }
-  }, [transactions]);
+  const addTransaction = async (tx: Omit<Transaction, "id">) => {
+    const { data, error } = await supabase
+      .from("expenses")
+      .insert({
+        description: tx.description,
+        category: tx.category,
+        amount: tx.amount,
+        date: tx.date,
+      })
+      .select("id, description, category, amount, date")
+      .single();
 
-  const addTransaction = (tx: Omit<Transaction, "id">) => {
-    const id = `${Date.now()}-${Math.random().toString(36).slice(2, 8)}`;
-    setTransactions((prev) =>
-      [
-        {
-          id,
-          ...tx,
-        },
-        ...prev,
-      ].sort((a, b) => (a.date < b.date ? 1 : -1))
-    );
+    if (error) {
+      console.error("Failed to insert expense into Supabase", error);
+      return;
+    }
+
+    if (data) {
+      setTransactions((prev) =>
+        [
+          {
+            id: data.id as string,
+            description: data.description ?? tx.description,
+            category: (data.category ?? tx.category) as Category,
+            amount: Number(data.amount ?? tx.amount),
+            date: data.date ?? tx.date,
+          },
+          ...prev,
+        ].sort((a, b) => (a.date < b.date ? 1 : -1))
+      );
+    }
   };
 
-  return { transactions, addTransaction };
+  const deleteTransaction = async (id: string) => {
+    const { error } = await supabase.from("expenses").delete().eq("id", id);
+    if (error) {
+      console.error("Failed to delete expense from Supabase", error);
+      return;
+    }
+
+    setTransactions((prev) => prev.filter((tx) => tx.id !== id));
+  };
+
+  return { transactions, addTransaction, deleteTransaction, loading };
 }
 
 export default function HomePage() {
-  const { transactions, addTransaction } = useTransactions();
+  const { transactions, addTransaction, deleteTransaction } = useTransactions();
   const [activeTab, setActiveTab] = useState<"dashboard" | "summary">("dashboard");
   const [shouldScrollToAdd, setShouldScrollToAdd] = useState(false);
-  const addTransactionRef = useRef(addTransaction);
+  const addTransactionRef = useRef<(tx: Omit<Transaction, "id">) => Promise<void> | void>(addTransaction);
 
   useEffect(() => {
     addTransactionRef.current = addTransaction;
@@ -176,7 +221,7 @@ export default function HomePage() {
       <header className="mb-4 flex items-center justify-between">
         <div>
           <p className="text-xs uppercase tracking-[0.16em] text-muted-foreground">This month</p>
-          <h1 className="mt-1 text-3xl font-semibold tracking-tight">${currentMonthTotal.toFixed(2)}</h1>
+          <h1 className="mt-1 text-3xl font-semibold tracking-tight">£{currentMonthTotal.toFixed(2)}</h1>
         </div>
         <button
           className="button-primary gap-2"
@@ -237,10 +282,22 @@ export default function HomePage() {
                       <div>
                         <p className="text-sm font-medium leading-tight">{tx.description}</p>
                         <p className="mt-0.5 text-xs text-muted-foreground">
-                          {tx.category}  b7 {day}
+                          {tx.category} · {day}
                         </p>
                       </div>
-                      <p className="text-sm font-semibold">${tx.amount.toFixed(2)}</p>
+                      <div className="flex items-center gap-3">
+                        <p className="text-sm font-semibold">£{tx.amount.toFixed(2)}</p>
+                        <button
+                          type="button"
+                          className="inline-flex h-8 w-8 items-center justify-center rounded-full bg-red-50 text-red-500 hover:bg-red-100 active:scale-[0.96] transition"
+                          onClick={() => {
+                            void deleteTransaction(tx.id);
+                          }}
+                          aria-label="Delete expense"
+                        >
+                          <Trash2 className="h-4 w-4" />
+                        </button>
+                      </div>
                     </li>
                   );
                 })}

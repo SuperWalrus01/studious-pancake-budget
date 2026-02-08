@@ -50,7 +50,7 @@ export function Summary({ transactions, selectedMonthKey }: Props) {
     <div className="space-y-4">
       <div className="flex items-baseline justify-between">
         <span className="text-xs uppercase tracking-[0.16em] text-muted-foreground">Total</span>
-        <span className="text-2xl font-semibold tracking-tight">${total.toFixed(2)}</span>
+        <span className="text-2xl font-semibold tracking-tight">£{total.toFixed(2)}</span>
       </div>
       <ul className="space-y-2">
         {entries.map(([category, value]) => {
@@ -66,7 +66,7 @@ export function Summary({ transactions, selectedMonthKey }: Props) {
                   </span>
                 </div>
                 <div className="text-right">
-                  <p className="text-sm font-semibold">${value.toFixed(2)}</p>
+                  <p className="text-sm font-semibold">£{value.toFixed(2)}</p>
                   <p className="text-xs text-muted-foreground">{pct.toFixed(0)}%</p>
                 </div>
               </div>
