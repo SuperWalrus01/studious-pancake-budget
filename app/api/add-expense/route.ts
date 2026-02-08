@@ -19,14 +19,14 @@ export async function POST(request: Request) {
     }
 
     const allowedCategories = [
+      "Groceries",
       "Food",
       "Transport",
-      "Housing",
-      "Utilities",
-      "Entertainment",
-      "Health",
-      "Shopping",
-      "Other",
+      "Household",
+      "Sport",
+      "Fun / Go out",
+      "Clothes",
+      "Tech / Hobby",
     ] as const;
 
     const category =

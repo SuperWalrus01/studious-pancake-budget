@@ -1,19 +1,22 @@
 "use client";
 
 import { useEffect, useMemo, useRef, useState } from "react";
-import { Plus, PieChart, List, Trash2 } from "lucide-react";
+import { Plus, PieChart, List, Trash2, RefreshCw, ShoppingBag } from "lucide-react";
 import { AddTransaction } from "@/components/AddTransaction";
 import { Summary } from "@/components/Summary";
+import { AddWishItem, type WishItemInput } from "@/components/AddWishItem";
+import { CATEGORY_COLOR_HEX } from "@/lib/categoryColors";
 import { supabase } from "@/lib/supabaseClient";
 
 export type Category =
+  | "Groceries"
   | "Food"
   | "Transport"
-  | "Housing"
-  | "Utilities"
-  | "Entertainment"
-  | "Health"
-  | "Shopping"
+  | "Household"
+  | "Sport"
+  | "Fun / Go out"
+  | "Clothes"
+  | "Tech / Hobby"
   | "Other";
 
 export type Transaction = {
@@ -24,49 +27,59 @@ export type Transaction = {
   date: string; // ISO string
 };
 
+export type WishItem = {
+  id: string;
+  name: string;
+  url: string;
+  price: number;
+  createdAt: string;
+};
+
 function getMonthKey(date: Date) {
   return `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, "0")}`;
+}
+
+function formatMonthKey(key: string) {
+  const [yearString, monthString] = key.split("-");
+  const year = Number(yearString);
+  const month = Number(monthString);
+  if (!year || !month) return key;
+
+  const d = new Date(year, month - 1, 1);
+  return d.toLocaleString(undefined, { month: "short", year: "numeric" });
 }
 
 function useTransactions() {
   const [transactions, setTransactions] = useState<Transaction[]>([]);
   const [loading, setLoading] = useState(true);
 
+  const loadFromSupabase = async () => {
+    setLoading(true);
+    const { data, error } = await supabase
+      .from("expenses")
+      .select("id, description, category, amount, date")
+      .order("date", { ascending: false });
+
+    if (error) {
+      console.error("Failed to load expenses from Supabase", error);
+      setTransactions([]);
+    } else if (data) {
+      setTransactions(
+        data.map((row) => ({
+          id: row.id as string,
+          description: row.description ?? "",
+          category: (row.category ?? "Other") as Category,
+          amount: Number(row.amount ?? 0),
+          date: row.date ?? new Date().toISOString(),
+        }))
+      );
+    }
+
+    setLoading(false);
+  };
+
   useEffect(() => {
-    let isMounted = true;
-
-    const load = async () => {
-      setLoading(true);
-      const { data, error } = await supabase
-        .from("expenses")
-        .select("id, description, category, amount, date")
-        .order("date", { ascending: false });
-
-      if (!isMounted) return;
-
-      if (error) {
-        console.error("Failed to load expenses from Supabase", error);
-        setTransactions([]);
-      } else if (data) {
-        setTransactions(
-          data.map((row) => ({
-            id: row.id as string,
-            description: row.description ?? "",
-            category: (row.category ?? "Other") as Category,
-            amount: Number(row.amount ?? 0),
-            date: row.date ?? new Date().toISOString(),
-          }))
-        );
-      }
-
-      setLoading(false);
-    };
-
-    void load();
-
-    return () => {
-      isMounted = false;
-    };
+    void loadFromSupabase();
   }, []);
 
   const addTransaction = async (tx: Omit<Transaction, "id">) => {
@@ -112,13 +125,91 @@ function useTransactions() {
     setTransactions((prev) => prev.filter((tx) => tx.id !== id));
   };
 
-  return { transactions, addTransaction, deleteTransaction, loading };
+  const reload = async () => {
+    await loadFromSupabase();
+  };
+
+  return { transactions, addTransaction, deleteTransaction, loading, reload };
+}
+
+function useWishlist() {
+  const [items, setItems] = useState<WishItem[]>([]);
+
+  useEffect(() => {
+    const load = async () => {
+      const { data, error } = await supabase
+        .from("wishlist_items")
+        .select("id, name, url, price, created_at")
+        .order("created_at", { ascending: false });
+
+      if (error) {
+        console.error("Failed to load wishlist from Supabase", error);
+        setItems([]);
+      } else if (data) {
+        setItems(
+          data.map((row) => ({
+            id: row.id as string,
+            name: row.name ?? "",
+            url: row.url ?? "",
+            price: Number(row.price ?? 0),
+            createdAt: row.created_at ?? new Date().toISOString(),
+          }))
+        );
+      }
+    };
+
+    void load();
+  }, []);
+
+  const addItem = async (input: WishItemInput) => {
+    const { data, error } = await supabase
+      .from("wishlist_items")
+      .insert({
+        name: input.name,
+        url: input.url,
+        price: input.price,
+      })
+      .select("id, name, url, price, created_at")
+      .single();
+
+    if (error) {
+      console.error("Failed to insert wishlist item into Supabase", error);
+      return;
+    }
+
+    if (data) {
+      setItems((prev) => [
+        {
+          id: data.id as string,
+          name: data.name ?? input.name,
+          url: data.url ?? input.url,
+          price: Number(data.price ?? input.price),
+          createdAt: data.created_at ?? new Date().toISOString(),
+        },
+        ...prev,
+      ]);
+    }
+  };
+
+  const deleteItem = async (id: string) => {
+    const { error } = await supabase.from("wishlist_items").delete().eq("id", id);
+    if (error) {
+      console.error("Failed to delete wishlist item from Supabase", error);
+      return;
+    }
+
+    setItems((prev) => prev.filter((item) => item.id !== id));
+  };
+
+  return { items, addItem, deleteItem };
 }
 
 export default function HomePage() {
-  const { transactions, addTransaction, deleteTransaction } = useTransactions();
-  const [activeTab, setActiveTab] = useState<"dashboard" | "summary">("dashboard");
+  const { transactions, addTransaction, deleteTransaction, loading, reload } = useTransactions();
+  const { items: wishlistItems, addItem, deleteItem } = useWishlist();
+  const [activeTab, setActiveTab] = useState<"dashboard" | "summary" | "wishlist">("dashboard");
   const [shouldScrollToAdd, setShouldScrollToAdd] = useState(false);
+  const [recentSort, setRecentSort] = useState<"time" | "category" | "amount">("time");
   const addTransactionRef = useRef<(tx: Omit<Transaction, "id">) => Promise<void> | void>(addTransaction);
 
   useEffect(() => {
@@ -141,6 +232,30 @@ export default function HomePage() {
     () => currentMonthTransactions.reduce((sum, tx) => sum + tx.amount, 0),
     [currentMonthTransactions]
   );
+
+  const sortedCurrentMonthTransactions = useMemo(() => {
+    const list = [...currentMonthTransactions];
+
+    if (recentSort === "category") {
+      return list.sort((a, b) => {
+        const byCategory = a.category.localeCompare(b.category);
+        if (byCategory !== 0) return byCategory;
+        return a.date < b.date ? 1 : -1;
+      });
+    }
+
+    if (recentSort === "amount") {
+      return list.sort((a, b) => {
+        if (a.amount === b.amount) {
+          return a.date < b.date ? 1 : -1;
+        }
+        return b.amount - a.amount; // highest amount first
+      });
+    }
+
+    // Default: sort by time (newest first)
+    return list.sort((a, b) => (a.date < b.date ? 1 : -1));
+  }, [currentMonthTransactions, recentSort]);
 
   const monthOptions = useMemo(() => {
     const keys = new Set<string>();
@@ -177,17 +292,20 @@ export default function HomePage() {
 
       const numericAmount = Number.parseFloat(amountParam.replace(",", "."));
 
-      const category: Category =
-        categoryParam === "Food" ||
-        categoryParam === "Transport" ||
-        categoryParam === "Housing" ||
-        categoryParam === "Utilities" ||
-        categoryParam === "Entertainment" ||
-        categoryParam === "Health" ||
-        categoryParam === "Shopping" ||
-        categoryParam === "Other"
-          ? categoryParam
-          : "Other";
+      const allowedCategories: Category[] = [
+        "Groceries",
+        "Food",
+        "Transport",
+        "Household",
+        "Sport",
+        "Fun / Go out",
+        "Clothes",
+        "Tech / Hobby",
+      ];
+
+      const category: Category = allowedCategories.includes(categoryParam as Category)
+        ? (categoryParam as Category)
+        : "Other";
 
       if (descriptionParam.trim() && Number.isFinite(numericAmount) && numericAmount > 0) {
         addTransactionRef.current({
@@ -223,16 +341,29 @@ export default function HomePage() {
           <p className="text-xs uppercase tracking-[0.16em] text-muted-foreground">This month</p>
           <h1 className="mt-1 text-3xl font-semibold tracking-tight">£{currentMonthTotal.toFixed(2)}</h1>
         </div>
-        <button
-          className="button-primary gap-2"
-          onClick={() => {
-            const el = document.getElementById("add-transaction");
-            if (el) el.scrollIntoView({ behavior: "smooth", block: "start" });
-          }}
-        >
-          <Plus className="h-5 w-5" />
-          <span>Add</span>
-        </button>
+        <div className="flex items-center gap-2">
+          <button
+            className="button-primary gap-2"
+            onClick={() => {
+              const el = document.getElementById("add-transaction");
+              if (el) el.scrollIntoView({ behavior: "smooth", block: "start" });
+            }}
+          >
+            <Plus className="h-5 w-5" />
+            <span>Add</span>
+          </button>
+          <button
+            type="button"
+            className="inline-flex h-9 w-9 items-center justify-center rounded-full border border-border bg-card text-muted-foreground hover:bg-muted active:scale-[0.96] transition disabled:opacity-50 disabled:active:scale-100"
+            onClick={() => {
+              void reload();
+            }}
+            disabled={loading}
+            aria-label="Refresh expenses"
+          >
+            <RefreshCw className={`h-4 w-4 ${loading ? "animate-spin" : ""}`} />
+          </button>
+        </div>
       </header>
 
       <section className="mb-4 rounded-full bg-muted px-1 py-1 navbar flex items-center justify-between text-sm font-medium">
@@ -254,35 +385,82 @@ export default function HomePage() {
           <PieChart className="h-4 w-4" />
           <span>Summary</span>
         </button>
+        <button
+          className={`flex flex-1 items-center justify-center gap-1 rounded-full px-3 py-2 transition ${
+            activeTab === "wishlist" ? "bg-white shadow-sm" : "text-muted-foreground"
+          }`}
+          onClick={() => setActiveTab("wishlist")}
+        >
+          <ShoppingBag className="h-4 w-4" />
+          <span>Want to buy</span>
+        </button>
       </section>
 
-      {activeTab === "dashboard" ? (
+      {activeTab === "dashboard" && (
         <div className="space-y-4 pb-8">
           <section id="add-transaction" className="card p-4">
             <AddTransaction onAdd={addTransaction} />
           </section>
 
           <section className="card p-4">
-            <header className="mb-2 flex items-center justify-between">
-              <h2 className="text-sm font-medium text-muted-foreground">Recent</h2>
-              <span className="text-xs text-muted-foreground">{currentMonthTransactions.length} items</span>
+            <header className="mb-2 flex items-center justify-between gap-3">
+              <div>
+                <h2 className="text-sm font-medium text-muted-foreground">Recent</h2>
+                <span className="text-xs text-muted-foreground">{currentMonthTransactions.length} items</span>
+              </div>
+              <div className="flex items-center gap-1 rounded-full bg-muted px-1 py-0.5 text-[11px] font-medium">
+                <button
+                  type="button"
+                  className={`rounded-full px-2 py-1 transition ${
+                    recentSort === "time" ? "bg-white shadow-sm" : "text-muted-foreground"
+                  }`}
+                  onClick={() => setRecentSort("time")}
+                >
+                  Time
+                </button>
+                <button
+                  type="button"
+                  className={`rounded-full px-2 py-1 transition ${
+                    recentSort === "category" ? "bg-white shadow-sm" : "text-muted-foreground"
+                  }`}
+                  onClick={() => setRecentSort("category")}
+                >
+                  Category
+                </button>
+                <button
+                  type="button"
+                  className={`rounded-full px-2 py-1 transition ${
+                    recentSort === "amount" ? "bg-white shadow-sm" : "text-muted-foreground"
+                  }`}
+                  onClick={() => setRecentSort("amount")}
+                >
+                  Amount
+                </button>
+              </div>
             </header>
             {currentMonthTransactions.length === 0 ? (
               <p className="text-sm text-muted-foreground">No expenses yet this month.</p>
             ) : (
               <ul className="divide-y divide-border">
-                {currentMonthTransactions.map((tx) => {
+                {sortedCurrentMonthTransactions.map((tx) => {
                   const d = new Date(tx.date);
                   const day = d.toLocaleDateString(undefined, {
                     month: "short",
                     day: "numeric",
+                  });
+                  const time = d.toLocaleTimeString(undefined, {
+                    hour: "2-digit",
+                    minute: "2-digit",
                   });
                   return (
                     <li key={tx.id} className="flex items-center justify-between py-3">
                       <div>
                         <p className="text-sm font-medium leading-tight">{tx.description}</p>
                         <p className="mt-0.5 text-xs text-muted-foreground">
-                          {tx.category} · {day}
+                          <span style={{ color: CATEGORY_COLOR_HEX[tx.category] }}>
+                            {tx.category}
+                          </span>{" "}
+                          · {day} · {time}
                         </p>
                       </div>
                       <div className="flex items-center gap-3">
@@ -305,14 +483,16 @@ export default function HomePage() {
             )}
           </section>
         </div>
-      ) : (
+      )}
+
+      {activeTab === "summary" && (
         <div className="space-y-4 pb-8">
           <section className="card p-4">
             <div className="mb-3 flex items-center justify-between gap-3">
               <div>
                 <p className="text-xs uppercase tracking-[0.16em] text-muted-foreground">Monthly summary</p>
                 <p className="mt-1 text-lg font-semibold tracking-tight">
-                  {selectedMonth.replace("-", " ")}
+                  {formatMonthKey(selectedMonth)}
                 </p>
               </div>
               <select
@@ -322,7 +502,7 @@ export default function HomePage() {
               >
                 {monthOptions.map((key) => (
                   <option key={key} value={key}>
-                    {key.replace("-", " ")}
+                    {formatMonthKey(key)}
                   </option>
                 ))}
               </select>
@@ -332,6 +512,79 @@ export default function HomePage() {
               transactions={transactions}
               selectedMonthKey={selectedMonth}
             />
+          </section>
+        </div>
+      )}
+
+      {activeTab === "wishlist" && (
+        <div className="space-y-4 pb-8">
+          <section className="card p-4">
+            <header className="mb-3 flex items-center justify-between gap-3">
+              <div>
+                <p className="text-xs uppercase tracking-[0.16em] text-muted-foreground">Want to buy</p>
+                <p className="mt-1 text-lg font-semibold tracking-tight">
+                  {wishlistItems.length} items
+                </p>
+              </div>
+              <div className="text-right text-sm">
+                <p className="text-xs uppercase tracking-[0.16em] text-muted-foreground">Total</p>
+                <p className="text-base font-semibold">
+                  £
+                  {wishlistItems
+                    .reduce((sum, item) => sum + (item.price ?? 0), 0)
+                    .toFixed(2)}
+                </p>
+              </div>
+            </header>
+
+            <AddWishItem onAdd={addItem} />
+          </section>
+
+          <section className="card p-4">
+            <header className="mb-2 flex items-center justify-between">
+              <h2 className="text-sm font-medium text-muted-foreground">Items</h2>
+              <span className="text-xs text-muted-foreground">{wishlistItems.length} saved</span>
+            </header>
+            {wishlistItems.length === 0 ? (
+              <p className="text-sm text-muted-foreground">Nothing on your wishlist yet.</p>
+            ) : (
+              <ul className="divide-y divide-border">
+                {wishlistItems.map((item) => (
+                  <li key={item.id} className="flex items-center justify-between py-3">
+                    <div className="max-w-[65%]">
+                      <p className="text-sm font-medium leading-tight truncate">
+                        {item.name}
+                      </p>
+                      {item.url && (
+                        <a
+                          href={item.url}
+                          target="_blank"
+                          rel="noreferrer"
+                          className="mt-0.5 block text-xs text-blue-600 underline truncate"
+                        >
+                          {item.url}
+                        </a>
+                      )}
+                    </div>
+                    <div className="flex items-center gap-3">
+                      <p className="text-sm font-semibold">
+                        {item.price > 0 ? `£${item.price.toFixed(2)}` : ""}
+                      </p>
+                      <button
+                        type="button"
+                        className="inline-flex h-8 w-8 items-center justify-center rounded-full bg-red-50 text-red-500 hover:bg-red-100 active:scale-[0.96] transition"
+                        onClick={() => {
+                          void deleteItem(item.id);
+                        }}
+                        aria-label="Delete wishlist item"
+                      >
+                        <Trash2 className="h-4 w-4" />
+                      </button>
+                    </div>
+                  </li>
+                ))}
+              </ul>
+            )}
           </section>
         </div>
       )}

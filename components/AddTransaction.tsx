@@ -4,13 +4,14 @@ import { FormEvent, useState } from "react";
 import type { Category, Transaction } from "@/app/page";
 
 const CATEGORIES: Category[] = [
+  "Groceries",
   "Food",
   "Transport",
-  "Housing",
-  "Utilities",
-  "Entertainment",
-  "Health",
-  "Shopping",
+  "Household",
+  "Sport",
+  "Fun / Go out",
+  "Clothes",
+  "Tech / Hobby",
   "Other",
 ];
 
@@ -20,7 +21,7 @@ type Props = {
 
 export function AddTransaction({ onAdd }: Props) {
   const [description, setDescription] = useState("");
-  const [category, setCategory] = useState<Category>("Food");
+  const [category, setCategory] = useState<Category>("Groceries");
   const [amount, setAmount] = useState("");
 
   async function handleSubmit(e: FormEvent) {
@@ -41,7 +42,7 @@ export function AddTransaction({ onAdd }: Props) {
 
     setDescription("");
     setAmount("");
-    setCategory("Food");
+    setCategory("Groceries");
   }
 
   return (

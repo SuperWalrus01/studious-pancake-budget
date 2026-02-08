@@ -1,17 +1,7 @@
 "use client";
 
 import type { Transaction, Category } from "@/app/page";
-
-const CATEGORY_COLORS: Record<Category, string> = {
-  Food: "bg-emerald-500/10 text-emerald-700",
-  Transport: "bg-sky-500/10 text-sky-700",
-  Housing: "bg-slate-500/10 text-slate-800",
-  Utilities: "bg-indigo-500/10 text-indigo-700",
-  Entertainment: "bg-violet-500/10 text-violet-700",
-  Health: "bg-rose-500/10 text-rose-700",
-  Shopping: "bg-amber-500/10 text-amber-700",
-  Other: "bg-zinc-500/10 text-zinc-700",
-};
+import { CATEGORY_COLOR_HEX } from "@/lib/categoryColors";
 
 function getMonthKey(date: Date) {
   return `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, "0")}`;
@@ -29,14 +19,15 @@ export function Summary({ transactions, selectedMonthKey }: Props) {
     acc[tx.category] = (acc[tx.category] ?? 0) + tx.amount;
     return acc;
   }, {
-    Food: 0,
-    Transport: 0,
-    Housing: 0,
-    Utilities: 0,
-    Entertainment: 0,
-    Health: 0,
-    Shopping: 0,
-    Other: 0,
+    "Groceries": 0,
+    "Food": 0,
+    "Transport": 0,
+    "Household": 0,
+    "Sport": 0,
+    "Fun / Go out": 0,
+    "Clothes": 0,
+    "Tech / Hobby": 0,
+    "Other": 0,
   });
 
   const entries = Object.entries(byCategory).filter(([, value]) => value > 0) as [Category, number][];
@@ -46,21 +37,53 @@ export function Summary({ transactions, selectedMonthKey }: Props) {
     return <p className="text-sm text-muted-foreground">No expenses recorded for this month yet.</p>;
   }
 
+  let currentOffset = 0;
+  const segments: string[] = [];
+  for (const [category, value] of entries) {
+    const pct = total > 0 ? (value / total) * 100 : 0;
+    const start = currentOffset;
+    const end = start + pct;
+    segments.push(`${CATEGORY_COLOR_HEX[category]} ${start}% ${end}%`);
+    currentOffset = end;
+  }
+
+  const pieBackground = segments.length
+    ? `conic-gradient(${segments.join(", ")})`
+    : "conic-gradient(#e5e7eb 0 100%)";
+
   return (
     <div className="space-y-4">
-      <div className="flex items-baseline justify-between">
-        <span className="text-xs uppercase tracking-[0.16em] text-muted-foreground">Total</span>
-        <span className="text-2xl font-semibold tracking-tight">£{total.toFixed(2)}</span>
+      <div className="flex items-center gap-4">
+        <div
+          className="relative h-24 w-24 rounded-full"
+          style={{ backgroundImage: pieBackground }}
+        >
+          <div className="absolute inset-4 flex flex-col items-center justify-center rounded-full bg-card">
+            <p className="text-[10px] uppercase tracking-[0.16em] text-muted-foreground">Total</p>
+            <p className="text-sm font-semibold">£{total.toFixed(2)}</p>
+          </div>
+        </div>
+        <div className="flex-1 text-right">
+          <p className="text-xs uppercase tracking-[0.16em] text-muted-foreground">Total spent</p>
+          <p className="text-2xl font-semibold tracking-tight">£{total.toFixed(2)}</p>
+        </div>
       </div>
-      <ul className="space-y-2">
+      <ul className="space-y-3">
         {entries.map(([category, value]) => {
           const pct = total > 0 ? (value / total) * 100 : 0;
           return (
-            <li key={category} className="rounded-2xl bg-muted px-3 py-2.5">
+            <li
+              key={category}
+              className="rounded-2xl bg-muted px-3 py-2.5 shadow-[0_1px_0_rgba(15,23,42,0.04)]"
+            >
               <div className="flex items-center justify-between">
                 <div className="flex items-center gap-2">
                   <span
-                    className={`inline-flex h-7 items-center rounded-full px-3 text-xs font-medium ${CATEGORY_COLORS[category]}`}
+                    className="inline-flex h-7 items-center rounded-full px-3 text-xs font-medium"
+                    style={{
+                      backgroundColor: `${CATEGORY_COLOR_HEX[category]}1a`,
+                      color: CATEGORY_COLOR_HEX[category],
+                    }}
                   >
                     {category}
                   </span>
@@ -72,8 +95,11 @@ export function Summary({ transactions, selectedMonthKey }: Props) {
               </div>
               <div className="mt-2 h-1.5 overflow-hidden rounded-full bg-white/60">
                 <div
-                  className="h-full rounded-full bg-black/80 transition-[width]"
-                  style={{ width: `${pct}%` }}
+                  className="h-full rounded-full transition-[width]"
+                  style={{
+                    width: `${pct}%`,
+                    backgroundColor: CATEGORY_COLOR_HEX[category],
+                  }}
                 />
               </div>
             </li>
