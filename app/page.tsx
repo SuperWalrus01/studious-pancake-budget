@@ -210,6 +210,7 @@ export default function HomePage() {
   const [activeTab, setActiveTab] = useState<"dashboard" | "summary" | "wishlist">("dashboard");
   const [shouldScrollToAdd, setShouldScrollToAdd] = useState(false);
   const [recentSort, setRecentSort] = useState<"time" | "category" | "amount">("time");
+  const [selectedWishlistItemIds, setSelectedWishlistItemIds] = useState<string[]>([]);
   const addTransactionRef = useRef<(tx: Omit<Transaction, "id">) => Promise<void> | void>(addTransaction);
 
   useEffect(() => {
@@ -272,6 +273,37 @@ export default function HomePage() {
     setSelectedMonth(currentMonthKey);
   }, [currentMonthKey]);
 
+  // Keep wishlist selection in sync with loaded items.
+  useEffect(() => {
+    if (!wishlistItems.length) {
+      setSelectedWishlistItemIds([]);
+      return;
+    }
+
+    const allIds = wishlistItems.map((item) => item.id);
+
+    setSelectedWishlistItemIds((prev) => {
+      // First-time load: select all by default
+      if (!prev.length) {
+        return allIds;
+      }
+
+      const itemIdSet = new Set(allIds);
+      const prevSet = new Set(prev);
+
+      // Remove ids that no longer exist
+      let next = prev.filter((id) => itemIdSet.has(id));
+
+      // Automatically select any newly added items
+      const addedIds = allIds.filter((id) => !prevSet.has(id));
+      if (addedIds.length) {
+        next = [...next, ...addedIds];
+      }
+
+      return next;
+    });
+  }, [wishlistItems]);
+
   // If opened with ?quickAdd=1, jump straight to the add form.
   useEffect(() => {
     if (typeof window === "undefined") return;
@@ -333,6 +365,19 @@ export default function HomePage() {
       setShouldScrollToAdd(false);
     }
   }, [shouldScrollToAdd, activeTab]);
+
+  const wishlistSelectedTotal = useMemo(
+    () =>
+      wishlistItems.reduce((sum, item) =>
+        selectedWishlistItemIds.includes(item.id) ? sum + (item.price ?? 0) : sum,
+      0),
+    [wishlistItems, selectedWishlistItemIds]
+  );
+
+  const selectedWishlistCount = useMemo(
+    () => wishlistItems.filter((item) => selectedWishlistItemIds.includes(item.id)).length,
+    [wishlistItems, selectedWishlistItemIds]
+  );
 
   return (
     <main className="flex min-h-screen flex-col">
@@ -527,12 +572,12 @@ export default function HomePage() {
                 </p>
               </div>
               <div className="text-right text-sm">
-                <p className="text-xs uppercase tracking-[0.16em] text-muted-foreground">Total</p>
+                <p className="text-xs uppercase tracking-[0.16em] text-muted-foreground">Selected total</p>
                 <p className="text-base font-semibold">
-                  £
-                  {wishlistItems
-                    .reduce((sum, item) => sum + (item.price ?? 0), 0)
-                    .toFixed(2)}
+                  £{wishlistSelectedTotal.toFixed(2)}
+                </p>
+                <p className="mt-0.5 text-[11px] text-muted-foreground">
+                  {selectedWishlistCount} of {wishlistItems.length} selected
                 </p>
               </div>
             </header>
@@ -541,48 +586,95 @@ export default function HomePage() {
           </section>
 
           <section className="card p-4">
-            <header className="mb-2 flex items-center justify-between">
+            <header className="mb-2 flex items-center justify-between gap-3">
               <h2 className="text-sm font-medium text-muted-foreground">Items</h2>
-              <span className="text-xs text-muted-foreground">{wishlistItems.length} saved</span>
+              <div className="flex items-center gap-2 text-xs">
+                <span className="text-muted-foreground">{wishlistItems.length} saved</span>
+                {wishlistItems.length > 0 && (
+                  <>
+                    <button
+                      type="button"
+                      className="rounded-full border border-border px-2 py-1 text-[11px] font-medium hover:bg-muted transition disabled:opacity-50"
+                      onClick={() => {
+                        setSelectedWishlistItemIds(wishlistItems.map((item) => item.id));
+                      }}
+                      disabled={
+                        wishlistItems.length > 0 &&
+                        selectedWishlistItemIds.length === wishlistItems.length
+                      }
+                    >
+                      Select all
+                    </button>
+                    <button
+                      type="button"
+                      className="rounded-full border border-border px-2 py-1 text-[11px] font-medium hover:bg-muted transition disabled:opacity-50"
+                      onClick={() => {
+                        setSelectedWishlistItemIds([]);
+                      }}
+                      disabled={selectedWishlistItemIds.length === 0}
+                    >
+                      Clear
+                    </button>
+                  </>
+                )}
+              </div>
             </header>
             {wishlistItems.length === 0 ? (
               <p className="text-sm text-muted-foreground">Nothing on your wishlist yet.</p>
             ) : (
               <ul className="divide-y divide-border">
-                {wishlistItems.map((item) => (
-                  <li key={item.id} className="flex items-center justify-between py-3">
-                    <div className="max-w-[65%]">
-                      <p className="text-sm font-medium leading-tight truncate">
-                        {item.name}
-                      </p>
-                      {item.url && (
-                        <a
-                          href={item.url}
-                          target="_blank"
-                          rel="noreferrer"
-                          className="mt-0.5 block text-xs text-blue-600 underline truncate"
+                {wishlistItems.map((item) => {
+                  const isSelected = selectedWishlistItemIds.includes(item.id);
+                  return (
+                    <li key={item.id} className="flex items-center justify-between py-3">
+                      <div className="flex items-center gap-2 max-w-[65%]">
+                        <input
+                          type="checkbox"
+                          className="h-4 w-4 rounded border-border text-slate-900 focus:ring-slate-900"
+                          checked={isSelected}
+                          onChange={() => {
+                            setSelectedWishlistItemIds((prev) =>
+                              prev.includes(item.id)
+                                ? prev.filter((id) => id !== item.id)
+                                : [...prev, item.id]
+                            );
+                          }}
+                          aria-label="Select item for total"
+                        />
+                        <div className="max-w-[calc(100%-1.5rem)]">
+                          <p className="text-sm font-medium leading-tight truncate">
+                            {item.name}
+                          </p>
+                          {item.url && (
+                            <a
+                              href={item.url}
+                              target="_blank"
+                              rel="noreferrer"
+                              className="mt-0.5 block text-xs text-blue-600 underline truncate"
+                            >
+                              {item.url}
+                            </a>
+                          )}
+                        </div>
+                      </div>
+                      <div className="flex items-center gap-3">
+                        <p className="text-sm font-semibold">
+                          {item.price > 0 ? `£${item.price.toFixed(2)}` : ""}
+                        </p>
+                        <button
+                          type="button"
+                          className="inline-flex h-8 w-8 items-center justify-center rounded-full bg-red-50 text-red-500 hover:bg-red-100 active:scale-[0.96] transition"
+                          onClick={() => {
+                            void deleteItem(item.id);
+                          }}
+                          aria-label="Delete wishlist item"
                         >
-                          {item.url}
-                        </a>
-                      )}
-                    </div>
-                    <div className="flex items-center gap-3">
-                      <p className="text-sm font-semibold">
-                        {item.price > 0 ? `£${item.price.toFixed(2)}` : ""}
-                      </p>
-                      <button
-                        type="button"
-                        className="inline-flex h-8 w-8 items-center justify-center rounded-full bg-red-50 text-red-500 hover:bg-red-100 active:scale-[0.96] transition"
-                        onClick={() => {
-                          void deleteItem(item.id);
-                        }}
-                        aria-label="Delete wishlist item"
-                      >
-                        <Trash2 className="h-4 w-4" />
-                      </button>
-                    </div>
-                  </li>
-                ))}
+                          <Trash2 className="h-4 w-4" />
+                        </button>
+                      </div>
+                    </li>
+                  );
+                })}
               </ul>
             )}
           </section>
