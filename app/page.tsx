@@ -7,9 +7,6 @@ import { Summary } from "@/components/Summary";
 import { AddWishItem, type WishItemInput } from "@/components/AddWishItem";
 import { PinLock } from "@/components/PinLock";
 import { Settings } from "@/components/Settings";
-import { MonthlyComparison } from "@/components/MonthlyComparison";
-import { Savings } from "@/components/Savings";
-import { BarChart3 } from "lucide-react";
 import { requestNotificationPermission, scheduleDailyNotifications, updateTodaySpending, updateLastExpenseDate } from "@/lib/notifications";
 import { offlineQueue } from "@/lib/offlineQueue";
 import { CATEGORY_COLOR_HEX } from "@/lib/categoryColors";
@@ -488,7 +485,7 @@ function useWishlist() {
 export default function HomePage() {
   const { transactions, addTransaction, deleteTransaction, updateTransaction, loading, reload } = useTransactions();
   const { items: wishlistItems, addItem, deleteItem, updateItem } = useWishlist();
-  const [activeTab, setActiveTab] = useState<"dashboard" | "summary" | "wishlist" | "analysis">("dashboard");
+  const [activeTab, setActiveTab] = useState<"dashboard" | "summary" | "wishlist">("dashboard");
   const [shouldScrollToAdd, setShouldScrollToAdd] = useState(false);
   const [recentSort, setRecentSort] = useState<"time" | "category" | "amount">("time");
   const [selectedWishlistItemIds, setSelectedWishlistItemIds] = useState<string[]>([]);
@@ -771,14 +768,6 @@ export default function HomePage() {
         >
           <ShoppingBag className="h-4 w-4" />
           <span>Want to buy</span>
-        </button>
-        <button
-          className={`flex flex-1 items-center justify-center gap-1 rounded-full px-3 py-2 transition ${activeTab === "analysis" ? "bg-white shadow-sm" : "text-muted-foreground"
-            }`}
-          onClick={() => setActiveTab("analysis")}
-        >
-          <BarChart3 className="h-4 w-4" />
-          <span>Analysis</span>
         </button>
       </section>
 
@@ -1063,21 +1052,7 @@ export default function HomePage() {
         </div>
       )}
 
-      {activeTab === "analysis" && (
-        <div className="space-y-4 pb-8">
-          <section className="card p-4">
-            <h2 className="text-sm font-medium text-muted-foreground mb-4">Monthly Spending</h2>
-            <div className="border border-border/50 rounded-lg p-4 bg-white/50">
-              <MonthlyComparison transactions={transactions} />
-            </div>
-          </section>
 
-          <section className="card p-4">
-            <h2 className="text-sm font-medium text-muted-foreground mb-4">Savings Reality</h2>
-            <Savings transactions={transactions} />
-          </section>
-        </div>
-      )}
 
       <Settings
         isOpen={isSettingsOpen}
