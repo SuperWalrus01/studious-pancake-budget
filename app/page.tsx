@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useMemo, useRef, useState } from "react";
-import { Plus, PieChart, List, Trash2, RefreshCw, ShoppingBag, Pencil, Check, X, Lock, Settings as SettingsIcon } from "lucide-react";
+import { Plus, PieChart, List, Trash2, RefreshCw, ShoppingBag, Pencil, Check, X, Lock, Settings as SettingsIcon, BarChart3 } from "lucide-react";
 import { AddTransaction } from "@/components/AddTransaction";
 import { Summary } from "@/components/Summary";
 import { AddWishItem, type WishItemInput } from "@/components/AddWishItem";
@@ -11,6 +11,24 @@ import { requestNotificationPermission, scheduleDailyNotifications, updateTodayS
 import { offlineQueue } from "@/lib/offlineQueue";
 import { CATEGORY_COLOR_HEX } from "@/lib/categoryColors";
 import { supabase } from "@/lib/supabaseClient";
+// import { MonthlyComparison } from "@/components/MonthlyComparison";
+// import { Savings } from "@/components/Savings";
+// import { MonthToMonthCategoryDiff } from "@/components/MonthToMonthCategoryDiff";
+import { useEffect as useEffectAuth, useState as useStateAuth } from "react";
+// Get Supabase user ID for authenticated user
+function useSupabaseUserId() {
+  const [userId, setUserId] = useStateAuth<string | null>(null);
+  useEffectAuth(() => {
+    let ignore = false;
+    async function fetchUser() {
+      const { data } = await supabase.auth.getUser();
+      if (!ignore) setUserId(data?.user?.id ?? null);
+    }
+    fetchUser();
+    return () => { ignore = true; };
+  }, []);
+  return userId;
+}
 
 export type Category =
   | "Groceries"
@@ -483,6 +501,7 @@ function useWishlist() {
 }
 
 export default function HomePage() {
+  const userId = useSupabaseUserId();
   const { transactions, addTransaction, deleteTransaction, updateTransaction, loading, reload } = useTransactions();
   const { items: wishlistItems, addItem, deleteItem, updateItem } = useWishlist();
   const [activeTab, setActiveTab] = useState<"dashboard" | "summary" | "wishlist">("dashboard");
@@ -770,6 +789,8 @@ export default function HomePage() {
           <span>Want to buy</span>
         </button>
       </section>
+
+
 
       {activeTab === "dashboard" && (
         <div className="space-y-4 pb-8">
