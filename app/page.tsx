@@ -724,16 +724,6 @@ export default function HomePage() {
         </div>
         <div className="flex items-center gap-2">
           <button
-            className="button-primary gap-2"
-            onClick={() => {
-              const el = document.getElementById("add-transaction");
-              if (el) el.scrollIntoView({ behavior: "smooth", block: "start" });
-            }}
-          >
-            <Plus className="h-5 w-5" />
-            <span>Add</span>
-          </button>
-          <button
             type="button"
             className="inline-flex h-9 w-9 items-center justify-center rounded-full border border-border bg-card text-muted-foreground hover:bg-muted active:scale-[0.96] transition disabled:opacity-50 disabled:active:scale-100"
             onClick={() => {
@@ -1009,7 +999,7 @@ export default function HomePage() {
                         />
                       ) : (
                         <>
-                          <div className="flex items-center gap-2 max-w-[65%]">
+                          <div className="flex items-center gap-2 flex-1 min-w-0">
                             <input
                               type="checkbox"
                               className="h-4 w-4 rounded border-border text-slate-900 focus:ring-slate-900"
@@ -1023,7 +1013,7 @@ export default function HomePage() {
                               }}
                               aria-label="Select item for total"
                             />
-                            <div className="max-w-[calc(100%-1.5rem)]">
+                            <div className="min-w-0 flex-1">
                               <p className="text-sm font-medium leading-tight truncate">
                                 {item.name}
                               </p>
@@ -1039,7 +1029,7 @@ export default function HomePage() {
                               )}
                             </div>
                           </div>
-                          <div className="flex items-center gap-2">
+                          <div className="flex items-center gap-2 flex-shrink-0">
                             <p className="text-sm font-semibold">
                               {item.price > 0 ? `£${item.price.toFixed(2)}` : ""}
                             </p>
