@@ -11,6 +11,8 @@ npm run dev
 
 Then open http://localhost:3000.
 
+<!-- Triggered redeploy on 2026-02-13 -->
+
 ## Deploying to Vercel
 
 1. Push this repo to GitHub.
